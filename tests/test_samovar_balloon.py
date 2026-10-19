@@ -1,4 +1,4 @@
-"""Тесты для самоварного аэростата «Пыхтун» (SPEC.md v0.2, TEST_CASES.md v0.2).
+"""Тесты для самоварного аэростата «Пыхтун» (SPEC.md v0.3, TEST_CASES.md v0.3).
 
 Запуск из корня репозитория:
 
@@ -118,6 +118,13 @@ class TestConstructor(unittest.TestCase):
                      "steam", "position_km", "lift_capacity_kg"):
             with self.subTest(attr=attr):
                 self.assertIsInstance(getattr(samovar, attr), float)
+
+        with_int_steam = SamovarBalloon(
+            "Пыхтун", mass_kg=150, balloon_volume_m3=800, max_speed_kmh=40,
+            steam=40,
+        )
+        self.assertIsInstance(with_int_steam.steam, float)
+        self.assertAlmostEqual(with_int_steam.steam, 40.0, places=PLACES)
 
     def test_tc02_init_empty_name_raises(self):
         """TC-02. Пустое имя или имя из пробелов → ValueError."""
@@ -404,6 +411,11 @@ class TestCanOvercome(unittest.TestCase):
 
         heavy = make_samovar(mass_kg=250)
 
+        empty_on_ground = make_samovar(steam=0)
+
+        empty_in_air = make_samovar(steam=2)
+        empty_in_air.move(1, "air")
+
         return {
             "на земле": (on_ground,
                          {"wall": False, "river": True, "low_bridge": True}),
@@ -411,7 +423,14 @@ class TestCanOvercome(unittest.TestCase):
                           {"wall": True, "river": True, "low_bridge": False}),
             "порвана": (torn,
                         {"wall": False, "river": False, "low_bridge": True}),
-            "перегруз": (heavy, {"river": False}),
+            "перегруз": (heavy,
+                         {"wall": False, "river": False, "low_bridge": True}),
+            "пар 0 на земле": (empty_on_ground,
+                               {"wall": False, "river": False,
+                                "low_bridge": True}),
+            "пар 0 в воздухе": (empty_in_air,
+                                {"wall": True, "river": False,
+                                 "low_bridge": False}),
         }
 
     def test_tc18_can_overcome_matrix(self):
@@ -505,6 +524,13 @@ class TestBrewTea(unittest.TestCase):
             samovar.brew_tea(4)
             self.assertAlmostEqual(samovar.steam, 0.0, places=PLACES)
 
+        with self.subTest(case="с порванной оболочкой"):
+            samovar = make_samovar()
+            samovar.tear_balloon()
+            samovar.brew_tea(2)
+            self.assertAlmostEqual(samovar.steam, 90.0, places=PLACES)
+            self.assertIs(samovar.balloon_intact, False)
+
     def test_tc23_brew_tea_invalid(self):
         """TC-23. Чашек < 1 → ValueError; не int → TypeError."""
         # Arrange
@@ -539,22 +565,31 @@ class TestBrewTea(unittest.TestCase):
 class TestBalloon(unittest.TestCase):
     """SPEC 3.4.6, 3.4.7."""
 
-    def test_tc25_tear_balloon_in_flight(self):
-        """TC-25. Разрыв оболочки в полёте — аварийная посадка."""
-        # Arrange
-        samovar = make_samovar()
-        samovar.move(10, "air")
+    def test_tc25_tear_balloon(self):
+        """TC-25. Разрыв оболочки: в полёте — аварийная посадка; на земле."""
+        with self.subTest(case="в полёте"):
+            # Arrange
+            samovar = make_samovar()
+            samovar.move(10, "air")
 
-        # Act
-        samovar.tear_balloon()
-        samovar.tear_balloon()
+            # Act
+            samovar.tear_balloon()
+            samovar.tear_balloon()
 
-        # Assert
-        self.assertIs(samovar.balloon_intact, False)
-        self.assertIs(samovar.is_flying, False)
-        self.assertIs(samovar.can_fly, False)
-        self.assertAlmostEqual(samovar.steam, 80.0, places=PLACES)
-        self.assertAlmostEqual(samovar.position_km, 10.0, places=PLACES)
+            # Assert
+            self.assertIs(samovar.balloon_intact, False)
+            self.assertIs(samovar.is_flying, False)
+            self.assertIs(samovar.can_fly, False)
+            self.assertAlmostEqual(samovar.steam, 80.0, places=PLACES)
+            self.assertAlmostEqual(samovar.position_km, 10.0, places=PLACES)
+
+        with self.subTest(case="на земле"):
+            samovar = make_samovar()
+            samovar.tear_balloon()
+            self.assertIs(samovar.balloon_intact, False)
+            self.assertIs(samovar.is_flying, False)
+            self.assertAlmostEqual(samovar.steam, 100.0, places=PLACES)
+            self.assertAlmostEqual(samovar.position_km, 0.0, places=PLACES)
 
     def test_tc26_patch_balloon(self):
         """TC-26. Починка возвращает возможность полёта; повтор безопасен."""
@@ -575,6 +610,13 @@ class TestBalloon(unittest.TestCase):
             samovar = make_samovar()
             samovar.patch_balloon()
             self.assertIs(samovar.balloon_intact, True)
+
+        with self.subTest(case="пара нет"):
+            samovar = make_samovar(steam=0)
+            samovar.tear_balloon()
+            samovar.patch_balloon()
+            self.assertIs(samovar.balloon_intact, True)
+            self.assertIs(samovar.can_fly, False)
 
 
 class TestStatusAndExceptions(unittest.TestCase):
@@ -823,6 +865,7 @@ class TestScenarios(unittest.TestCase):
         self.assertIs(samovar.can_fly, False)
         self.assertIs(pilot.может_преодолеть("wall"), True)
         self.assertIs(pilot.может_преодолеть("river"), False)
+        self.assertIs(pilot.может_преодолеть("low_bridge"), False)
 
         # When пилот пытается пролететь 0.5 км / Then нужно 1, есть 0
         with self.assertRaises(SamovarOutOfSteam) as ctx:
