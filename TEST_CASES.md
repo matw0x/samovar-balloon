@@ -1,10 +1,10 @@
 # Test Case Specification: Самоварный аэростат «Пыхтун»
 
-Версия: 0.3 (к SPEC.md v0.3)
+Версия: 1.1 (к SPEC.md v1.1)
 
 Эталонный аппарат (если не сказано иное): `SamovarBalloon("Пыхтун", mass_kg=150, balloon_volume_m3=800, max_speed_kmh=40, steam=100)`. Его грузоподъёмность 200 кг.
 
-Соотношение: 29 модульных / 5 сценарных ≈ 85 / 15.
+Соотношение: 31 модульный / 5 сценарных ≈ 86 / 14.
 
 ## Модульные тесты (module, AAA)
 
@@ -39,6 +39,8 @@
 | TC-27 | module | SPEC 3.4.8 | после move(10, "air") | get_status(), затем изменить словарь | ключи ровно {name, steam, position_km, is_flying, balloon_intact, can_fly}; значения "Пыхтун", 80, 10, True, True, True; изменение словаря не меняет объект | medium |
 | TC-28 | module | SPEC 6.1 | — | issubclass(...) | 4 доменных ⊂ SamovarError ⊂ CrazyVehicleError ⊂ Exception; SamovarOutOfSteam имеет required/available | medium |
 | TC-34 | module | SPEC 3.0, 3.2, 3.4.1, 3.4.3, 3.4.4 | эталон | конструктор: mass_kg=nan, balloon_volume_m3=inf, max_speed_kmh=-inf, steam=nan ; move(inf, "air") ; move(nan, "air") ; calculate_steam(inf, "air") ; add_coal(inf) ; add_coal(nan) | ValueError; состояние не изменилось | medium |
+| TC-35 | module (regression, BR-02) | SPEC 3.0 п. 7 | steam=0.6 | move(0.1, "air") дважды, затем ещё раз | третий вызов: SamovarOutOfSteam, required=0.2; состояние после второго вызова не изменилось | medium |
+| TC-36 | module (regression, BR-03) | SPEC 3.4.7 | после move(1, "air"), оболочка цела | patch_balloon() | is_flying=True; balloon_intact=True; steam=98; position_km=1 | medium |
 
 ## Сценарные тесты (scenario, GWT)
 

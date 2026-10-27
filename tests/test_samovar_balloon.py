@@ -1,4 +1,4 @@
-"""Тесты для самоварного аэростата «Пыхтун» (SPEC.md v0.3, TEST_CASES.md v0.3).
+"""Тесты для самоварного аэростата «Пыхтун» (SPEC.md v1.1, TEST_CASES.md v1.1).
 
 Запуск из корня репозитория:
 
@@ -661,6 +661,37 @@ class TestStatusAndExceptions(unittest.TestCase):
         error = SamovarOutOfSteam(required=6, available=2)
         self.assertAlmostEqual(error.required, 6.0, places=PLACES)
         self.assertAlmostEqual(error.available, 2.0, places=PLACES)
+
+    def test_tc35_exact_steam_comparison(self):
+        """TC-35. Regression BR-02: пар сравнивается точно, без допуска."""
+        # Arrange
+        samovar = make_samovar(steam=0.6)
+        samovar.move(0.1, "air")
+        samovar.move(0.1, "air")
+        before = snapshot(samovar)
+
+        # Act
+        with self.assertRaises(SamovarOutOfSteam) as ctx:
+            samovar.move(0.1, "air")
+
+        # Assert
+        self.assertAlmostEqual(ctx.exception.required, 0.2, places=PLACES)
+        self.assertEqual(snapshot(samovar), before)
+
+    def test_tc36_patch_intact_balloon_in_flight(self):
+        """TC-36. Regression BR-03: починка не сажает аппарат."""
+        # Arrange
+        samovar = make_samovar()
+        samovar.move(1, "air")
+
+        # Act
+        samovar.patch_balloon()
+
+        # Assert
+        self.assertIs(samovar.is_flying, True)
+        self.assertIs(samovar.balloon_intact, True)
+        self.assertAlmostEqual(samovar.steam, 98.0, places=PLACES)
+        self.assertAlmostEqual(samovar.position_km, 1.0, places=PLACES)
 
     def test_tc34_non_finite_numbers_raise(self):
         """TC-34. nan, inf и -inf → ValueError, состояние не меняется."""
